@@ -5,15 +5,13 @@ import base
 from django.template import Template, Context
 from django.utils.encoding import force_unicode
 from django.utils.safestring import mark_safe
-from test_utils.templatetags import TemplateParser
 
+TEST_TEMPLATE = """go {{ path }}"""
 
-TEST_TEMPLATE = """    def test_{{path}}_{{time}}(self):
-        r = self.client.{{method}}({{request_str}})"""
+STATUS_TEMPLATE = """code {{ status_code }}"""
 
-STATUS_TEMPLATE = """        self.assertEqual(r.status_code, {{status_code}})"""
-
-CONTEXT_TEMPLATE = """        self.assertEqual(unicode(r.context[-1]['{{key}}']), u'{{value}}')"""
+#CONTEXT_TEMPLATE = '''find {{value}}'''
+CONTEXT_TEMPLATE = ''
 
 def safe_dict(dict):
     new_dic = {}
@@ -35,17 +33,12 @@ class Processor(base.Processer):
     def save_response(self, request, response):
         if self.shall_we_proceed(request):
             self._log_status(response)
+            '''#TODO make this log sanely.
             if response.context and response.status_code != 404:
                 context = self._get_context(response.context)
                 self._log_context(context)
                 #This is where template tag outputting would go
-                #Turned off until it gets betterer
-                """
-                parser = TemplateParser(response.template[0], context)
-                parser.parse()
-                parser.create_tests()
-                """
-
+            '''
 
     def _log_request(self, request):
         method = request.method.lower()
@@ -57,7 +50,7 @@ class Processor(base.Processer):
 
         template = Template(TEST_TEMPLATE)
         context = {
-            'path': base.slugify(request.path),
+            'path': request.path,
             'time': base.slugify(time.time()),
             'method': method,
             'request_str': request_str,
