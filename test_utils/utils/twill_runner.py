@@ -48,6 +48,7 @@ import cookielib
 import twill
 import twill.commands
 import twill.browser
+from twill.errors import TwillAssertionError
 
 from django.conf import settings
 from django.core.servers.basehttp import AdminMediaHandler
@@ -56,6 +57,8 @@ from django.core.urlresolvers import reverse
 from django.http import HttpRequest
 from django.utils.datastructures import SortedDict
 from django.contrib import auth
+from django.contrib.auth.models import User
+from django.contrib.sessions.models import Session
 from django.core import signals
 from django.db import close_connection
 
@@ -220,7 +223,9 @@ class _EasyTwillBrowser(twill.browser.TwillBrowser):
 
         if self._testing_:   # hack that makes it simple for us to test this
             return url
+
         return super(_EasyTwillBrowser, self).go(url)
+
 
     def login(self, **credentials):
         """Log the user with the given credentials into your Django
@@ -353,3 +358,36 @@ def url(should_be=None):
         return get_browser().get_url()
     else:
         return twill.commands.url(should_be)
+
+
+def current_user(should_be=None):
+    """Return the currently logged in user, or, if ``should_be`` is set,
+    assert that it equals the current session's user. You can pass ``False``
+    to test for "no user logged in".
+    """
+    user_id = None
+    cookies = get_browser().cj
+    for cookie in cookies:
+        if cookie.name == 'sessionid':
+            try:
+                session = Session.objects.get(pk=cookie.value)
+            except Session.DoesNotExist:
+                pass
+            else:
+                user_id = session.get_decoded()['_auth_user_id']
+            break
+
+    if should_be is not None:
+        should_be_id = None
+        if should_be:
+            should_be_id = should_be.id
+        if (should_be_id != user_id):
+            raise TwillAssertionError("""\
+current user id %s;
+does not match %s
+""" % (user_id, should_be_id,))
+    elif user_id is not None:
+        return User.objects.get(pk=user_id)
+    else:
+        return None
+
